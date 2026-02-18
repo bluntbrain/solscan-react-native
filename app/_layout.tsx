@@ -1,5 +1,6 @@
 // app/_layout.tsx
 // root layout - wraps entire app with providers
+import "../src/polyfills";
 import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
