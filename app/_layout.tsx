@@ -13,6 +13,13 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         {/* token detail screen stacks on top of tabs */}
         <Stack.Screen name="token/[mint]" />
+        {/* send sol modal screen */}
+        <Stack.Screen
+          name="send"
+          options={{
+            presentation: "modal",
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );
