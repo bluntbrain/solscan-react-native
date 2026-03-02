@@ -6,7 +6,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
   ScrollView,
   ActivityIndicator,
   StyleSheet,
@@ -18,6 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useWalletStore } from "../../src/stores/wallet-store";
 import { FavoriteButton } from "../../src/components/FavoriteButton";
 import { ConnectButton } from "../../src/components/ConnectButton";
@@ -222,26 +222,36 @@ export default function WalletScreen() {
           </View>
 
           {searchHistory.length > 0 && balance === null && (
-            <View style={s.historySection}>
+            <Animated.View
+              style={s.historySection}
+              entering={FadeInDown.delay(100).springify()}
+            >
               <Text style={s.historyTitle}>Recent Searches</Text>
-              {searchHistory.slice(0, 5).map((addr) => (
-                <TouchableOpacity
+              {searchHistory.slice(0, 5).map((addr, index) => (
+                <Animated.View
                   key={addr}
-                  style={s.historyItem}
-                  onPress={() => searchFromHistory(addr)}
+                  entering={FadeInDown.delay(150 + index * 50).springify()}
                 >
-                  <Ionicons name="time-outline" size={16} color="#6B7280" />
-                  <Text style={s.historyAddress} numberOfLines={1}>
-                    {short(addr, 8)}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={16} color="#6B7280" />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={s.historyItem}
+                    onPress={() => searchFromHistory(addr)}
+                  >
+                    <Ionicons name="time-outline" size={16} color="#6B7280" />
+                    <Text style={s.historyAddress} numberOfLines={1}>
+                      {short(addr, 8)}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                </Animated.View>
               ))}
-            </View>
+            </Animated.View>
           )}
 
           {balance !== null && (
-            <View style={s.card}>
+            <Animated.View
+              style={s.card}
+              entering={FadeInDown.delay(100).springify()}
+            >
               <View style={s.favoriteWrapper}>
                 <FavoriteButton address={address.trim()} />
               </View>
@@ -260,17 +270,17 @@ export default function WalletScreen() {
                   <Text style={s.sendNavText}>Send SOL</Text>
                 </TouchableOpacity>
               )}
-            </View>
+            </Animated.View>
           )}
 
           {tokens.length > 0 && (
-            <>
+            <Animated.View entering={FadeInDown.delay(200).springify()}>
               <Text style={s.section}>Tokens ({tokens.length})</Text>
-              <FlatList
-                data={tokens}
-                keyExtractor={(t) => t.mint}
-                scrollEnabled={false}
-                renderItem={({ item }) => (
+              {tokens.map((item: { mint: string; amount: number }, index: number) => (
+                <Animated.View
+                  key={item.mint}
+                  entering={FadeInDown.delay(250 + index * 50).springify()}
+                >
                   <TouchableOpacity
                     style={s.row}
                     onPress={() =>
@@ -287,19 +297,19 @@ export default function WalletScreen() {
                       />
                     </View>
                   </TouchableOpacity>
-                )}
-              />
-            </>
+                </Animated.View>
+              ))}
+            </Animated.View>
           )}
 
           {txns.length > 0 && (
-            <>
+            <Animated.View entering={FadeInDown.delay(300).springify()}>
               <Text style={s.section}>Recent Transactions</Text>
-              <FlatList
-                data={txns}
-                keyExtractor={(t) => t.sig}
-                scrollEnabled={false}
-                renderItem={({ item }) => (
+              {txns.map((item: { sig: string; time: number; ok: boolean }, index: number) => (
+                <Animated.View
+                  key={item.sig}
+                  entering={FadeInDown.delay(350 + index * 50).springify()}
+                >
                   <TouchableOpacity
                     style={s.row}
                     onPress={() =>
@@ -321,9 +331,9 @@ export default function WalletScreen() {
                       {item.ok ? "+" : "-"}
                     </Text>
                   </TouchableOpacity>
-                )}
-              />
-            </>
+                </Animated.View>
+              ))}
+            </Animated.View>
           )}
 
           <View style={{ height: 100 }} />
