@@ -71,10 +71,11 @@ export async function getSwapQuote(
   amount: number,
   slippageBps: number = 50
 ): Promise<QuoteResponse> {
-  console.log("[jupiter] getSwapQuote called");
+  console.log("[jupiter] ========== getSwapQuote ==========");
   console.log("[jupiter] inputMint:", inputMint);
   console.log("[jupiter] outputMint:", outputMint);
-  console.log("[jupiter] amount:", amount);
+  console.log("[jupiter] amount (smallest unit):", amount);
+  console.log("[jupiter] slippageBps:", slippageBps, `(${slippageBps / 100}%)`);
 
   const params = new URLSearchParams({
     inputMint,
@@ -85,10 +86,12 @@ export async function getSwapQuote(
 
   const url = `${JUPITER_API}/quote?${params}`;
   console.log("[jupiter] fetching quote from:", url);
+  console.log("[jupiter] using API key:", JUPITER_API_KEY ? "yes (set)" : "no (missing!)");
 
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
+      console.log(`[jupiter] attempt ${attempt}/3...`);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
 
@@ -110,12 +113,21 @@ export async function getSwapQuote(
       }
 
       const quote = await response.json();
-      console.log("[jupiter] quote received, outAmount:", quote.outAmount);
+      console.log("[jupiter] quote received:");
+      console.log("[jupiter]   - inAmount:", quote.inAmount);
+      console.log("[jupiter]   - outAmount:", quote.outAmount);
+      console.log("[jupiter]   - priceImpactPct:", quote.priceImpactPct, "%");
+      console.log("[jupiter]   - routes:", quote.routePlan?.length || 0);
+      if (quote.routePlan?.length > 0) {
+        console.log("[jupiter]   - route:", quote.routePlan.map((r: { swapInfo: { label: string } }) => r.swapInfo.label).join(" -> "));
+      }
+      console.log("[jupiter] ======================================");
       return quote;
     } catch (err) {
       lastError = err as Error;
       console.log(`[jupiter] attempt ${attempt} failed:`, lastError.message);
       if (attempt < 3) {
+        console.log("[jupiter] retrying in 1 second...");
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
@@ -131,11 +143,41 @@ export async function getSwapTransaction(
   quoteResponse: QuoteResponse,
   userPublicKey: string
 ): Promise<string> {
-  console.log("[jupiter] getSwapTransaction called");
+  console.log("[jupiter] ========== getSwapTransaction ==========");
   console.log("[jupiter] userPublicKey:", userPublicKey);
+  console.log("[jupiter] quote inAmount:", quoteResponse.inAmount);
+  console.log("[jupiter] quote outAmount:", quoteResponse.outAmount);
+  console.log("[jupiter] slippageBps:", quoteResponse.slippageBps);
 
   const swapUrl = `${JUPITER_API}/swap`;
-  console.log("[jupiter] posting swap to:", swapUrl);
+  console.log("[jupiter] posting to:", swapUrl);
+
+  // build request body with explanations
+  const requestBody = {
+    // the quote we got from /quote endpoint
+    quoteResponse,
+    // user's wallet address that will sign the transaction
+    userPublicKey,
+    // auto wrap SOL to wSOL and unwrap wSOL to SOL (for SOL swaps)
+    wrapAndUnwrapSol: true,
+    // dynamically calculate compute units needed (saves fees)
+    dynamicComputeUnitLimit: true,
+    // priority fee settings to land transaction faster
+    prioritizationFeeLamports: {
+      priorityLevelWithMaxLamports: {
+        // priority level: medium, high, or veryHigh
+        priorityLevel: "high",
+        // max lamports willing to pay for priority (cap to prevent overpaying)
+        maxLamports: 1000000, // 0.001 SOL max priority fee
+      },
+    },
+  };
+
+  console.log("[jupiter] request options:");
+  console.log("[jupiter]   - wrapAndUnwrapSol: true (auto handle SOL <-> wSOL)");
+  console.log("[jupiter]   - dynamicComputeUnitLimit: true (optimize compute units)");
+  console.log("[jupiter]   - priorityLevel: high (faster tx landing)");
+  console.log("[jupiter]   - maxLamports: 1000000 (max 0.001 SOL priority fee)");
 
   const response = await fetch(swapUrl, {
     method: "POST",
@@ -144,18 +186,7 @@ export async function getSwapTransaction(
       Accept: "application/json",
       "x-api-key": JUPITER_API_KEY,
     },
-    body: JSON.stringify({
-      quoteResponse,
-      userPublicKey,
-      wrapAndUnwrapSol: true,
-      dynamicComputeUnitLimit: true,
-      prioritizationFeeLamports: {
-        priorityLevelWithMaxLamports: {
-          priorityLevel: "high",
-          maxLamports: 1000000,
-        },
-      },
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
@@ -165,7 +196,11 @@ export async function getSwapTransaction(
   }
 
   const data = await response.json();
-  console.log("[jupiter] swap transaction received");
+  console.log("[jupiter] swap transaction received successfully");
+  console.log("[jupiter] lastValidBlockHeight:", data.lastValidBlockHeight);
+  console.log("[jupiter] prioritizationFeeLamports:", data.prioritizationFeeLamports);
+  console.log("[jupiter] ==========================================");
+
   return data.swapTransaction;
 }
 
